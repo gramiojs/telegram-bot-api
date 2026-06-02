@@ -1,10 +1,9 @@
 # GramIO local Bot API server — base compose.
 #
-# The bot talks to the server over HTTP only and has NO volume mount.
-# This covers sending and receiving updates + uploads. To DOWNLOAD large files
-# (getFile returns an absolute path in --local mode), add the nginx overlay:
-#
-#   docker compose -f docker-compose.example.yml -f docker-compose.nginx.yml up -d
+# FILE_SERVER=1 makes the server also serve downloaded files over HTTP (port 8080)
+# at token-less, path-based URLs, so the bot needs no shared volume — it talks HTTP
+# only. (Prefer one process per container? Drop FILE_SERVER and add the nginx sidecar:
+#   docker compose -f docker-compose.example.yml -f docker-compose.nginx.yml up -d )
 #
 services:
   telegram-bot-api:
@@ -14,11 +13,13 @@ services:
       # from .env — see .env.example
       TELEGRAM_API_ID: ${TELEGRAM_API_ID}
       TELEGRAM_API_HASH: ${TELEGRAM_API_HASH}
+      FILE_SERVER: "1" # serve downloaded files on :8080 (token-less URLs)
       # TELEGRAM_LOCAL: "0"   # uncomment to keep the cloud-style URL download flow
     volumes:
       - telegram-bot-api-data:/var/lib/telegram-bot-api
     ports:
       - "8081:8081" # Bot API
+      - "8080:8080" # file downloads
       # - "8082:8082" # stats (optional, used by the healthcheck internally)
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8082/"]
@@ -38,6 +39,8 @@ services:
       BOT_TOKEN: ${BOT_TOKEN}
       # GramIO: api.baseURL — note the required /bot suffix.
       API_BASE_URL: http://telegram-bot-api:8081/bot
+      # where the bundled file server is reachable (for building download URLs)
+      FILES_BASE_URL: http://telegram-bot-api:8080
 
 volumes:
   telegram-bot-api-data:

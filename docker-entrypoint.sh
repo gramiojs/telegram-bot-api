@@ -96,6 +96,47 @@ arg_from_env proxy                    TELEGRAM_PROXY
 # any extra args passed to the container are appended verbatim
 COMMAND="$COMMAND $*"
 
+# --- optional bundled file server (nginx) ----------------------------------
+# When FILE_SERVER=1, also serve the working dir over HTTP at path-based,
+# token-less URLs (e.g. http://host:8080/<bot_id>/documents/file.jpg) so a
+# single container does both the Bot API and large-file downloads.
+case "${FILE_SERVER:-0}" in
+	1 | true | TRUE | yes | YES | on | ON)
+		FS_PORT="${FILE_SERVER_PORT:-8080}"
+		FS_ROOT="${TELEGRAM_WORK_DIR:-/var/lib/telegram-bot-api}"
+		mkdir -p /tmp/nginx/tmp
+		# non-root nginx: pid, temp paths and logs all go to writable locations
+		cat > /tmp/nginx/nginx.conf <<EOF
+worker_processes auto;
+daemon off;
+pid /tmp/nginx/nginx.pid;
+error_log /dev/stderr warn;
+events { worker_connections 1024; }
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+    access_log /dev/stdout;
+    client_body_temp_path /tmp/nginx/tmp;
+    proxy_temp_path /tmp/nginx/tmp;
+    fastcgi_temp_path /tmp/nginx/tmp;
+    uwsgi_temp_path /tmp/nginx/tmp;
+    scgi_temp_path /tmp/nginx/tmp;
+    sendfile on;
+    server {
+        listen ${FS_PORT};
+        location = /healthz { access_log off; return 200 "ok\n"; }
+        location / {
+            root ${FS_ROOT};
+            autoindex off;
+        }
+    }
+}
+EOF
+		echo "telegram-bot-api: file server (nginx) on :${FS_PORT}, serving ${FS_ROOT}" >&2
+		nginx -c /tmp/nginx/nginx.conf &
+		;;
+esac
+
 # log the command with secrets masked
 echo "telegram-bot-api: starting" >&2
 echo "$COMMAND" | sed -E 's/(--api-(id|hash)=)[^ ]+/\1***/g' >&2

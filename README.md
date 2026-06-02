@@ -54,11 +54,20 @@ docker compose -f docker-compose.example.yml up -d
 
 ### Downloading files (when bot and server don't share a disk)
 
-In `--local` mode `getFile` returns an **absolute path on the server's disk**, not a URL. If your bot can't read that disk, add the nginx overlay — it serves the working dir over HTTP at **token-less, path-based** URLs:
+In `--local` mode `getFile` returns an **absolute path on the server's disk**, not a URL. If your bot can't read that disk, let this image serve the files for you.
+
+**Easiest — bundled file server (`FILE_SERVER=1`):** one container does both the Bot API and downloads. nginx serves the working dir over HTTP at **token-less, path-based** URLs (`http://host:8080/<bot_id>/documents/file.jpg`). Off by default, one flag to enable — ideal for Coolify/Dokploy/Railway where you deploy a single image:
 
 ```sh
-docker compose -f docker-compose.example.yml -f docker-compose.nginx.yml up -d
+docker run -d \
+  -e TELEGRAM_API_ID=… -e TELEGRAM_API_HASH=… \
+  -e FILE_SERVER=1 \
+  -p 8081:8081 -p 8080:8080 \
+  -v telegram-bot-api-data:/var/lib/telegram-bot-api \
+  ghcr.io/gramiojs/telegram-bot-api:latest
 ```
+
+Then in the bot, build the download URL by swapping the working-dir prefix for `http://host:8080`. (Separate nginx sidecar — `docker-compose.nginx.yml` — also available if you prefer one process per container.)
 
 See the [GramIO guide → Downloading files](https://gramio.dev/bot-api/local#downloading-files).
 
@@ -69,12 +78,12 @@ See the [GramIO guide → Downloading files](https://gramio.dev/bot-api/local#do
 | `TELEGRAM_API_ID` *(required)* | — | `--api-id` |
 | `TELEGRAM_API_HASH` *(required)* | — | `--api-hash` |
 | `TELEGRAM_LOCAL` | `1` | `--local` (set `0` to disable) |
+| `FILE_SERVER` | `0` | bundled nginx file server (`1` to enable) |
+| `FILE_SERVER_PORT` | `8080` | port for the bundled file server |
 | `TELEGRAM_WORK_DIR` | `/var/lib/telegram-bot-api` | `--dir` |
 | `TELEGRAM_TEMP_DIR` | `/tmp/telegram-bot-api` | `--temp-dir` |
 | `TELEGRAM_HTTP_PORT` | `8081` | `--http-port` |
 | `TELEGRAM_STAT_PORT` | `8082` | `--http-stat-port` |
-| `TELEGRAM_MAX_WEBHOOK_CONNECTIONS` | — | `--max-webhook-connections` |
-| `TELEGRAM_MAX_CONNECTIONS` | — | `--max-connections` |
 | `TELEGRAM_FILTER` | — | `--filter` |
 | `TELEGRAM_MAX_WEBHOOK_CONNECTIONS` | — | `--max-webhook-connections` |
 | `TELEGRAM_MAX_CONNECTIONS` | — | `--max-connections` |

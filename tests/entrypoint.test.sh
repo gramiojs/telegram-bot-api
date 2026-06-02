@@ -125,6 +125,41 @@ if grep -q "supersecret" "$WORK/err"; then
 else
 	PASS=$((PASS + 1)); printf 'ok   - secret is not leaked to logs\n'
 fi
+unset TELEGRAM_API_HASH
+
+# --- bundled file server (FILE_SERVER) ---------------------------------------
+# stub nginx so the entrypoint's `nginx -c ... &` is observable
+printf '#!/bin/sh\necho "NGINX $*" >> "%s/nginx.log"\n' "$WORK" > "$WORK/nginx"
+chmod +x "$WORK/nginx"
+
+export TELEGRAM_API_HASH=abc
+# default OFF: nginx must not be invoked
+rm -f "$WORK/nginx.log"
+run
+if [ -f "$WORK/nginx.log" ]; then
+	FAIL=$((FAIL + 1)); printf 'FAIL - FILE_SERVER off by default (nginx should not start)\n'
+else
+	PASS=$((PASS + 1)); printf 'ok   - FILE_SERVER off by default (nginx not started)\n'
+fi
+
+# ON: nginx started, config generated, server still exec'd
+rm -f "$WORK/nginx.log" /tmp/nginx/nginx.conf
+export FILE_SERVER=1 FILE_SERVER_PORT=9090
+run
+assert_code 0 "FILE_SERVER=1 still starts the server"
+assert_out "ARGS: " "server is exec'd alongside nginx"
+sleep 1 # nginx is backgrounded; give the stub a moment to write its marker
+if [ -f "$WORK/nginx.log" ]; then
+	PASS=$((PASS + 1)); printf 'ok   - nginx started when FILE_SERVER=1\n'
+else
+	FAIL=$((FAIL + 1)); printf 'FAIL - nginx started when FILE_SERVER=1\n'
+fi
+if grep -q "listen 9090;" /tmp/nginx/nginx.conf 2>/dev/null; then
+	PASS=$((PASS + 1)); printf 'ok   - nginx config honors FILE_SERVER_PORT\n'
+else
+	FAIL=$((FAIL + 1)); printf 'FAIL - nginx config honors FILE_SERVER_PORT\n'
+fi
+unset FILE_SERVER FILE_SERVER_PORT
 
 # --- summary -----------------------------------------------------------------
 printf '\n%s passed, %s failed\n' "$PASS" "$FAIL"
