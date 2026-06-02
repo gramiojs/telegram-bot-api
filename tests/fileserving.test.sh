@@ -28,6 +28,9 @@ trap cleanup EXIT INT TERM
 mkdir -p "$WORK/123456/documents"
 CONTENT="hello from the local bot api server"
 printf '%s' "$CONTENT" > "$WORK/123456/documents/report.txt"
+# nginx worker runs as a different uid than the CI runner; mktemp -d is 0700,
+# so make the tree world-traversable/readable or nginx returns 403.
+chmod -R a+rX "$WORK"
 
 docker run -d --name "$NAME" -p "$PORT:80" \
 	-v "$WORK:/var/lib/telegram-bot-api:ro" \
