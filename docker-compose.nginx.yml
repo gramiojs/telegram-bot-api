@@ -1,0 +1,35 @@
+# Optional overlay — adds an nginx sidecar that serves downloaded files over HTTP.
+#
+# Why: in --local mode getFile returns an absolute path on the SERVER's disk, not a
+# download URL. The bot usually can't read that disk. nginx shares the working-dir
+# volume (read-only) and exposes the files at path-based, token-less URLs:
+#
+#   http://files-host/<bot_id>/documents/file_5.jpg
+#
+# The bot turns the absolute file_path into this URL by swapping the working-dir
+# prefix for the nginx base URL (gramio core does this via files.filesBaseURL).
+#
+# Enable with:
+#   docker compose -f docker-compose.example.yml -f docker-compose.nginx.yml up -d
+#
+services:
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    depends_on:
+      telegram-bot-api:
+        condition: service_healthy
+    volumes:
+      # SAME volume as the server, mounted read-only.
+      - telegram-bot-api-data:/var/lib/telegram-bot-api:ro
+      - ./nginx/telegram-files.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "8080:80" # public file download endpoint
+
+  bot:
+    environment:
+      # public URL of nginx (used by bot.getFileLink for shareable links)
+      FILES_BASE_URL: http://localhost:8080
+      # in-cluster URL nginx is reachable at (used by ctx.download)
+      FILES_INTERNAL_URL: http://nginx
+      LOCAL_BOT_API_DIR: /var/lib/telegram-bot-api
