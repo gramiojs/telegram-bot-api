@@ -15,7 +15,7 @@ A best-in-class Docker image of the [Telegram Bot API server](https://github.com
 | Registry | Reference |
 | --- | --- |
 | GHCR | `ghcr.io/gramiojs/telegram-bot-api:latest` |
-| Docker Hub | `gramio/telegram-bot-api:latest` |
+| Docker Hub | `gramiojs/telegram-bot-api:latest` |
 
 | Tag | Description |
 | --- | --- |

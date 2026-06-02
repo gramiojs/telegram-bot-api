@@ -25,7 +25,7 @@ permissions:
 
 env:
   GHCR_IMAGE: ghcr.io/${{ github.repository_owner }}/telegram-bot-api
-  DOCKERHUB_IMAGE: gramio/telegram-bot-api
+  DOCKERHUB_IMAGE: gramiojs/telegram-bot-api
   # mapped to env so step-level `if:` can gate on it (the `secrets` context is not available in `if`)
   DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
   DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
