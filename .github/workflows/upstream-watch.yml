@@ -1,0 +1,39 @@
+name: upstream-watch
+
+# Daily check for new tdlib/telegram-bot-api commits. When the upstream master
+# SHA differs from the one baked into the current :latest image, trigger a rebuild.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 5 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compare upstream SHA with the published image
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          UPSTREAM=$(git ls-remote https://github.com/tdlib/telegram-bot-api.git master | cut -f1)
+          echo "upstream master: $UPSTREAM"
+
+          IMAGE="ghcr.io/${{ github.repository_owner }}/telegram-bot-api:latest"
+          # org.opencontainers.image.revision label carries the built upstream SHA
+          BUILT=$(docker buildx imagetools inspect "$IMAGE" --format '{{ index .Image.Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "")
+          echo "built revision: ${BUILT:-<none>}"
+
+          if [ "$UPSTREAM" = "$BUILT" ]; then
+            echo "Up to date — skipping rebuild."
+            exit 0
+          fi
+
+          echo "Upstream changed → dispatching build."
+          gh api "repos/${{ github.repository }}/dispatches" \
+            -f event_type=upstream-update \
+            -F client_payload[ref]="$UPSTREAM"

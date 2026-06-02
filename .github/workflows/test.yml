@@ -1,0 +1,33 @@
+name: test
+
+on:
+  push:
+    paths:
+      - docker-entrypoint.sh
+      - nginx/**
+      - tests/**
+      - .github/workflows/test.yml
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  entrypoint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: shellcheck
+        run: shellcheck docker-entrypoint.sh tests/*.sh
+
+      - name: entrypoint tests
+        run: sh tests/entrypoint.test.sh
+
+  file-serving:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Docker is preinstalled on ubuntu runners; the test serves a planted file
+      # through nginx and asserts a token-less, path-based download URL.
+      - name: file-serving integration test
+        run: sh tests/fileserving.test.sh
