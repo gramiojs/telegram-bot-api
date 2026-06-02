@@ -1,0 +1,11 @@
+.git
+.github
+docker-compose*.yml
+nginx
+tests
+example-bot
+*.md
+LICENSE
+.env
+.env.example
+.gitignore
